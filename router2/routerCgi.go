@@ -46,22 +46,35 @@ const filePath string = "works3.json"
 // getAllData 作品データをすべて送るAPI
 func getAllData(w rest.ResponseWriter, r *rest.Request) {
 
-	bytes, err := readFile(filePath)
-	var bodyData ID
-
+	rawData, err := getSimpleJSON(filePath)
 	if err != nil {
 		rest.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	var Datas Data
-	Datas, err = makeJSON(bytes, bodyData)
+	data := rawData.Get("Id")
 
-	if err != nil {
-		rest.Error(w, err.Error(), http.StatusBadRequest)
+	works := make([]ID, 0)
+	for _, v := range data.MustMap() {
+		fake, _ := json.Marshal(v)
+		if err != nil {
+			fmt.Println(err)
+			break
+		}
+		var box ID
+		err = json.Unmarshal(fake, &box)
+		if err != nil {
+			fmt.Println(err)
+			break
+		}
+		works = append(works, box)
 	}
 
-	w.WriteJson(&Datas)
+	var result Data
+
+	result.Id = works
+
+	w.WriteJson(&result)
 }
 
 // GetAWork リクエストされたデータを返すAPI
