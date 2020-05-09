@@ -100,43 +100,40 @@ func GetAWork(w rest.ResponseWriter, r *rest.Request) {
 
 // PostData 送られてきたデータを書き込むAPI
 func PostData(w rest.ResponseWriter, r *rest.Request) {
-	var postData ID
-	err := r.DecodeJsonPayload(&postData)
-	//送られてきたデータをCountry型に落とし込む。
-	//落とし込め得ない場合はたぶんエラー
+	CreatedWorkTag := "WorkTag6"
+	DesignationUserID := "Id"
+
+	var sendData map[string]interface{}
+	err := r.DecodeJsonPayload(&sendData)
 	if err != nil {
 		rest.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	data, err := getSimpleJSON(filePath)
+
+	data.Get(DesignationUserID).SetPath([]string{CreatedWorkTag}, sendData)
+
+	works := make([]ID, 0)
+	for _, v := range data.MustMap() {
+		fake, _ := json.Marshal(v)
+		var box ID
+		err = json.Unmarshal(fake, &box)
+		if err != nil {
+			rest.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		works = append(works, box)
+	}
+
+	o, _ := data.EncodePretty()
+	err = writeFile(filePath, o)
 	if err != nil {
 		rest.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	bytes, err := readFile(filePath)
-
-	if err != nil {
-		rest.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	var Datas Data
-	Datas, err = makeJSON(bytes, postData)
-
-	if err != nil {
-		rest.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	err = writeJSON(filePath, Datas)
-
-	if err != nil {
-		rest.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteJson(&Datas)
+	w.WriteHeader(http.StatusOK)
 }
 
 func makeJSON(bytes []byte, body ID) (ids Data, err error) {
