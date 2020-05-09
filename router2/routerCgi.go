@@ -2,11 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/cgi"
 	"os"
+
+	"github.com/bitly/go-simplejson"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/mitchellh/mapstructure"
@@ -28,6 +31,7 @@ func main() {
 	})
 	router, err := rest.MakeRouter(
 		rest.Get("/aps/routerCgi.cgi/getAllData", getAllData),
+		rest.Get("/aps/routerCgi.cgi/PostData/:request", GetAWork),
 		rest.Post("/aps/routerCgi.cgi/PostData", PostData),
 	)
 	if err != nil {
@@ -37,8 +41,9 @@ func main() {
 	cgi.Serve(api.MakeHandler())
 }
 
-const filePath string = "works.json"
+const filePath string = "works3.json"
 
+// getAllData 作品データをすべて送るAPI
 func getAllData(w rest.ResponseWriter, r *rest.Request) {
 
 	bytes, err := readFile(filePath)
@@ -59,6 +64,28 @@ func getAllData(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(&Datas)
 }
 
+// GetAWork リクエストされたデータを返すAPI
+func GetAWork(w rest.ResponseWriter, r *rest.Request) {
+	request := r.PathParam("request")
+
+	rawData, err := getSimpleJSON(filePath)
+	if err != nil {
+		rest.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	data := rawData.GetPath("Id", request)
+	var result ID
+
+	b, err := data.MarshalJSON()
+	if err := json.Unmarshal(b, &result); err != nil {
+		rest.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	w.WriteJson(&result)
+}
+
+// PostData 送られてきたデータを書き込むAPI
 func PostData(w rest.ResponseWriter, r *rest.Request) {
 	var postData ID
 	err := r.DecodeJsonPayload(&postData)
@@ -130,6 +157,20 @@ func writeJSON(Filename string, data Data) (err error) {
 	}
 
 	return writeFile(Filename, result)
+}
+
+func getSimpleJSON(filePath string) (j *simplejson.Json, err error) {
+
+	bytes, err := readFile(filePath)
+	var rawData *simplejson.Json
+	if err != nil {
+		fmt.Println(err)
+		return rawData, err
+	}
+
+	rawData, err = simplejson.NewJson(bytes)
+
+	return rawData, err
 }
 
 func writeFile(filename string, bytes []byte) (err error) {
