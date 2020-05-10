@@ -86,13 +86,29 @@ func GetAWork(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	data := rawData.GetPath("Id", request)
-	var result ID
-
-	b, err := data.MarshalJSON()
-	if err := json.Unmarshal(b, &result); err != nil {
-		rest.Error(w, err.Error(), http.StatusBadRequest)
+	data, tof := rawData.Get("Id").CheckGet(request)
+	if !tof {
+		rest.Error(w, "no data"+request, http.StatusInternalServerError)
 	}
+
+	works := make([]ID, 0)
+	v := data.MustMap()
+	fake, _ := json.Marshal(v)
+	if err != nil {
+		rest.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var box ID
+	err = json.Unmarshal(fake, &box)
+	if err != nil {
+		rest.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	works = append(works, box)
+
+	var result Data
+
+	result.Id = works
 
 	w.WriteJson(&result)
 }
