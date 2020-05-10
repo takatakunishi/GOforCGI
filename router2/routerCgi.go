@@ -9,10 +9,9 @@ import (
 	"net/http/cgi"
 	"os"
 
-	"github.com/bitly/go-simplejson"
-
 	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/mitchellh/mapstructure"
+	"github.com/bitly/go-simplejson"
+	"github.com/rs/xid"
 )
 
 func main() {
@@ -31,7 +30,7 @@ func main() {
 	})
 	router, err := rest.MakeRouter(
 		rest.Get("/aps/routerCgi.cgi/getAllData", getAllData),
-		rest.Get("/aps/routerCgi.cgi/PostData/:request", GetAWork),
+		rest.Get("/aps/routerCgi.cgi/GetAWork/:request", GetAWork),
 		rest.Post("/aps/routerCgi.cgi/PostData", PostData),
 	)
 	if err != nil {
@@ -41,7 +40,7 @@ func main() {
 	cgi.Serve(api.MakeHandler())
 }
 
-const filePath string = "works3.json"
+const filePath string = "works.json"
 
 // getAllData 作品データをすべて送るAPI
 func getAllData(w rest.ResponseWriter, r *rest.Request) {
@@ -100,63 +99,61 @@ func GetAWork(w rest.ResponseWriter, r *rest.Request) {
 
 // PostData 送られてきたデータを書き込むAPI
 func PostData(w rest.ResponseWriter, r *rest.Request) {
-	CreatedWorkTag := "WorkTag6"
+	var CreatedWorkTag string = (xid.New()).String()
 	DesignationUserID := "Id"
 
 	var sendData map[string]interface{}
 	err := r.DecodeJsonPayload(&sendData)
 	if err != nil {
-		rest.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Fatal(109)
 		return
 	}
 
 	data, err := getSimpleJSON(filePath)
 
-	data.Get(DesignationUserID).SetPath([]string{CreatedWorkTag}, sendData)
+	_, tof := data.Get(DesignationUserID).CheckGet(CreatedWorkTag)
 
-	works := make([]ID, 0)
-	for _, v := range data.MustMap() {
-		fake, _ := json.Marshal(v)
-		var box ID
-		err = json.Unmarshal(fake, &box)
-		if err != nil {
-			rest.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+	if tof {
+		var i = 0
+		for {
+			if i < 5 && tof {
+				_, tof = data.CheckGet(CreatedWorkTag)
+				if i == 4 {
+					log.Fatal(123)
+					rest.Error(w, "Failed to Tagging. Retry sends data!", http.StatusInternalServerError)
+					break
+				}
+			}
+			i++
 		}
-		works = append(works, box)
 	}
+
+	data.Get(DesignationUserID).SetPath([]string{CreatedWorkTag}, sendData)
+	data.Get(DesignationUserID).Get(CreatedWorkTag).Set("WorkTag", CreatedWorkTag)
 
 	o, _ := data.EncodePretty()
 	err = writeFile(filePath, o)
 	if err != nil {
-		rest.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Fatal(136)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-}
-
-func makeJSON(bytes []byte, body ID) (ids Data, err error) {
-	var data map[string]interface{}
-	var Datas Data
-
-	if err := json.Unmarshal(bytes, &data); err != nil {
-		return Datas, err
-	}
-	//mapにエンコード
-
-	works := make([]ID, 1)
-	err = mapstructure.Decode(data["Id"], &works)
+	fake, err := data.Get(DesignationUserID).Get(CreatedWorkTag).MarshalJSON()
 	if err != nil {
-		return Datas, err
+		log.Fatal(141)
+		return
 	}
-
-	if body.WorkTag != "" {
-		works = append(works, body)
+	var resultJSON ID
+	err = json.Unmarshal(fake, &resultJSON)
+	if err != nil {
+		log.Fatal(147)
+		return
 	}
-
-	Datas.Id = works
-	return Datas, nil
+	err = w.WriteJson(&resultJSON)
+	if err != nil {
+		log.Fatal(153)
+		return
+	}
 }
 
 func writeJSON(Filename string, data Data) (err error) {
